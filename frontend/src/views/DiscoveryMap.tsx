@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react';
 import { ArrowLeft, MapPin, Phone, Clock, Navigation, Star, Sparkles } from 'lucide-react';
-import { APIProvider, Map, Marker, InfoWindow } from '@vis.gl/react-google-maps';
-import { getBusinesses } from '../services/businessService';
+import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF } from '@react-google-maps/api';
+import { getBusinesses, Business } from '../services/businessService';
+
+interface DiscoveryMapProps {
+  onBack: () => void;
+}
 
 const CATEGORIES = [
   { name: 'Todos', color: 'gray' },
@@ -11,23 +15,38 @@ const CATEGORIES = [
   { name: 'Abarrotes', color: 'blue' },
 ];
 
+const mapContainerStyle = {
+  width: '100%',
+  height: '100%',
+};
+
+// Durango, Mexico center coordinates
 const durangoCenter = {
   lat: 24.027729,
   lng: -104.653027,
 };
 
-export default function Explorar({ onBack }) {
-  const [businesses, setBusinesses] = useState([]);
+export function DiscoveryMap({ onBack }: DiscoveryMapProps) {
+  const [businesses, setBusinesses] = useState<Business[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('Todos');
-  const [selectedBusiness, setSelectedBusiness] = useState(null);
+  const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
 
+  // Manage temporary API Key in sessionStorage for easy hackathon evaluation
   const [tempApiKey, setTempApiKey] = useState(() => {
     return sessionStorage.getItem('temp_google_maps_api_key') || '';
   });
 
   const activeApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || tempApiKey;
 
+  // Load Google Maps API
+  const { isLoaded, loadError } = useJsApiLoader({
+    id: 'google-map-script',
+    googleMapsApiKey: activeApiKey || 'DUMMY_KEY', // Avoid empty string warning
+    // We load script only if key is set
+  });
+
+  // Load businesses from unified business service
   useEffect(() => {
     async function loadData() {
       setIsLoading(true);
@@ -46,18 +65,18 @@ export default function Explorar({ onBack }) {
   const filteredBusinesses = selectedCategory === 'Todos'
     ? businesses
     : businesses.filter(b =>
-        b.giro?.toLowerCase().includes(selectedCategory.toLowerCase()) ||
-        b.tags?.some(tag => tag.toLowerCase().includes(selectedCategory.toLowerCase()))
+        b.giro.toLowerCase().includes(selectedCategory.toLowerCase()) ||
+        b.tags.some(tag => tag.toLowerCase().includes(selectedCategory.toLowerCase()))
       );
 
-  const handleMarkerClick = (business) => {
+  const handleMarkerClick = (business: Business) => {
     setSelectedBusiness(business);
   };
 
   return (
     <div className="size-full flex flex-col">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4 z-10 shadow-sm shrink-0">
+      <div className="bg-white border-b border-gray-200 px-6 py-4 z-10 shadow-sm">
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center gap-4 mb-4">
             <button
@@ -98,39 +117,51 @@ export default function Explorar({ onBack }) {
         
         {/* Map Area */}
         <div className="flex-1 relative bg-gray-100 h-full">
-          {activeApiKey ? (
-            <APIProvider apiKey={activeApiKey}>
-              <Map
-                defaultZoom={selectedBusiness ? 16 : 14}
-                defaultCenter={selectedBusiness ? { lat: selectedBusiness.latitude, lng: selectedBusiness.longitude } : durangoCenter}
-                gestureHandling={'greedy'}
-                disableDefaultUI={false}
-              >
-                {filteredBusinesses.map((business) => (
-                  <Marker
-                    key={business.id}
-                    position={{ lat: business.latitude, lng: business.longitude }}
-                    onClick={() => handleMarkerClick(business)}
-                    title={business.nombre}
-                  />
-                ))}
+          {activeApiKey && isLoaded && !loadError ? (
+            /* REAL GOOGLE MAPS INTEGRATION */
+            <GoogleMap
+              mapContainerStyle={mapContainerStyle}
+              center={selectedBusiness ? { lat: selectedBusiness.latitude, lng: selectedBusiness.longitude } : durangoCenter}
+              zoom={selectedBusiness ? 16 : 14}
+              options={{
+                disableDefaultUI: false,
+                zoomControl: true,
+                mapTypeControl: false,
+                streetViewControl: false,
+                fullscreenControl: false,
+              }}
+            >
+              {filteredBusinesses.map((business) => (
+                <MarkerF
+                  key={business.id}
+                  position={{ lat: business.latitude, lng: business.longitude }}
+                  onClick={() => handleMarkerClick(business)}
+                  title={business.nombre}
+                  icon={
+                    selectedBusiness?.id === business.id
+                      ? 'https://maps.google.com/mapfiles/ms/icons/purple-dot.png'
+                      : 'https://maps.google.com/mapfiles/ms/icons/red-dot.png'
+                  }
+                />
+              ))}
 
-                {selectedBusiness && (
-                  <InfoWindow
-                    position={{ lat: selectedBusiness.latitude, lng: selectedBusiness.longitude }}
-                    onCloseClick={() => setSelectedBusiness(null)}
-                  >
-                    <div className="p-2 max-w-[200px] text-gray-900">
-                      <h4 className="font-bold text-sm">{selectedBusiness.nombre}</h4>
-                      <p className="text-xs text-gray-600">{selectedBusiness.giro}</p>
-                      <p className="text-xs mt-1 text-purple-600 font-semibold">{selectedBusiness.horario}</p>
-                    </div>
-                  </InfoWindow>
-                )}
-              </Map>
-            </APIProvider>
+              {selectedBusiness && (
+                <InfoWindowF
+                  position={{ lat: selectedBusiness.latitude, lng: selectedBusiness.longitude }}
+                  onCloseClick={() => setSelectedBusiness(null)}
+                >
+                  <div className="p-2 max-w-[200px] text-gray-900">
+                    <h4 className="font-bold text-sm">{selectedBusiness.nombre}</h4>
+                    <p className="text-xs text-gray-600">{selectedBusiness.giro}</p>
+                    <p className="text-xs mt-1 text-purple-600 font-semibold">{selectedBusiness.horario}</p>
+                  </div>
+                </InfoWindowF>
+              )}
+            </GoogleMap>
           ) : (
+            /* INTERACTIVE FALLBACK MAP */
             <div className="absolute inset-0 bg-gradient-to-br from-orange-50 via-purple-50 to-pink-50 flex items-center justify-center overflow-hidden">
+              {/* Decorative grid for a map feel */}
               <div className="absolute inset-0 opacity-10 bg-[linear-gradient(to_right,#808080_1px,transparent_1px),linear-gradient(to_bottom,#808080_1px,transparent_1px)] bg-[size:24px_24px]" />
               
               <div className="text-center space-y-4 z-10 px-6">
@@ -141,11 +172,14 @@ export default function Explorar({ onBack }) {
                 </p>
               </div>
 
-              {filteredBusinesses.map((business) => {
+              {/* Pins simulados interactivos en coordenadas escaladas */}
+              {filteredBusinesses.map((business, index) => {
+                // Scale coordinates relative to Durango center for a representative layout
                 const scaleX = (business.longitude - durangoCenter.lng) * 4000;
                 const scaleY = (business.latitude - durangoCenter.lat) * 4000;
+                
                 const styleLeft = `calc(50% + ${scaleX}px)`;
-                const styleTop = `calc(50% - ${scaleY}px)`;
+                const styleTop = `calc(50% - ${scaleY}px)`; // invert lat for screen coordinates
 
                 return (
                   <button
@@ -164,7 +198,7 @@ export default function Explorar({ onBack }) {
               })}
             </div>
           )}
-          
+
           {/* API Key Configuration Overlay */}
           {!import.meta.env.VITE_GOOGLE_MAPS_API_KEY && (
             <div className="absolute top-4 left-4 right-4 md:left-auto md:w-96 bg-white/95 backdrop-blur shadow-xl rounded-2xl p-4 border border-orange-200 z-20 space-y-3">
@@ -173,7 +207,7 @@ export default function Explorar({ onBack }) {
                 <span className="text-sm">Google Maps API Key</span>
               </div>
               <p className="text-xs text-gray-600 leading-relaxed">
-                Ingresa una clave de Google Maps temporal para cargar la visualización oficial:
+                Ingresa una clave de Google Maps temporal o agrégala a tu <code className="bg-gray-100 px-1 py-0.5 rounded font-mono text-red-600">.env</code> como <code className="bg-gray-100 px-1 py-0.5 rounded font-mono text-purple-600">VITE_GOOGLE_MAPS_API_KEY</code> para cargar la visualización oficial:
               </p>
               <div className="flex gap-2">
                 <input
@@ -198,6 +232,9 @@ export default function Explorar({ onBack }) {
                   </button>
                 )}
               </div>
+              <p className="text-[10px] text-gray-400 italic">
+                *La clave se guarda localmente en esta sesión de navegador.
+              </p>
             </div>
           )}
         </div>
@@ -256,7 +293,7 @@ export default function Explorar({ onBack }) {
                         />
                       ))}
                       <span className="text-xs text-gray-600 ml-1">
-                        {business.rating?.toFixed(1) || '0.0'}
+                        {business.rating.toFixed(1)}
                       </span>
                     </div>
 
@@ -272,7 +309,7 @@ export default function Explorar({ onBack }) {
                     </div>
 
                     <div className="flex flex-wrap gap-1">
-                      {business.tags?.map((tag) => (
+                      {business.tags.map((tag) => (
                         <span
                           key={tag}
                           className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-[10px] font-medium"
@@ -313,14 +350,14 @@ export default function Explorar({ onBack }) {
                 <Star
                   key={i}
                   className={`size-5 ${
-                    i < Math.floor(selectedBusiness.rating || 0)
+                    i < Math.floor(selectedBusiness.rating)
                       ? 'fill-yellow-400 text-yellow-400'
                       : 'text-gray-300'
                   }`}
                 />
               ))}
               <span className="text-sm font-semibold ml-2 text-gray-700">
-                {(selectedBusiness.rating || 0).toFixed(1)} de 5
+                {selectedBusiness.rating.toFixed(1)} de 5
               </span>
             </div>
 
@@ -351,7 +388,7 @@ export default function Explorar({ onBack }) {
             </div>
 
             <div className="flex flex-wrap gap-2 pt-2">
-              {selectedBusiness.tags?.map((tag) => (
+              {selectedBusiness.tags.map((tag) => (
                 <span
                   key={tag}
                   className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-medium"
@@ -377,7 +414,13 @@ export default function Explorar({ onBack }) {
   );
 }
 
-function InfoRow({ icon, label, value }) {
+interface InfoRowProps {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+}
+
+function InfoRow({ icon, label, value }: InfoRowProps) {
   return (
     <div className="flex items-start gap-3">
       <div className="text-purple-600 mt-0.5">{icon}</div>
