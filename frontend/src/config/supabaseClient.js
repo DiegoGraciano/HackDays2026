@@ -9,5 +9,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.error("Fallo en las variables de entorno");
 }
 
-// Inicializamos y exportamos el cliente
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Inicializamos y exportamos el cliente de forma segura
+export const supabase = (supabaseUrl && supabaseAnonKey)
+  ? createClient(supabaseUrl, supabaseAnonKey)
+  : null;

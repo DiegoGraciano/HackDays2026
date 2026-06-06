@@ -29,7 +29,7 @@ export function ConfirmationStep({ data, onConfirm, onEdit }: ConfirmationStepPr
 
       {/* Map Preview */}
       <div className="bg-white rounded-3xl shadow-lg overflow-hidden border border-gray-200">
-        <div className="bg-gradient-to-r from-purple-600 to-orange-600 h-64 flex items-center justify-center relative">
+        <div className="bg-slate-700 h-64 flex items-center justify-center relative">
           {/* Mapa simulado - en producción usar Google Maps */}
           <div className="absolute inset-0 bg-gray-200 opacity-50" />
           <div className="relative z-10 text-center text-white">
@@ -162,7 +162,7 @@ export function ConfirmationStep({ data, onConfirm, onEdit }: ConfirmationStepPr
         </button>
         <button
           onClick={onConfirm}
-          className="flex-1 bg-gradient-to-r from-purple-600 to-orange-600 hover:from-purple-700 hover:to-orange-700 text-white font-semibold py-4 px-6 rounded-2xl transition-all flex items-center justify-center gap-2 shadow-lg"
+          className="flex-1 bg-slate-700 hover:bg-slate-800 text-white font-semibold py-4 px-6 rounded-2xl transition-all flex items-center justify-center gap-2 shadow-lg"
         >
           <Check className="size-5" />
           Confirmar y Registrar
